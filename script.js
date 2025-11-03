@@ -8,7 +8,18 @@ const CATEGORIES = [
   "Десятина",
 ];
 
-const STORAGE_KEY = "kislenko_budget_v1";
+// 💰 Ліміти для кожної категорії
+const LIMITS = {
+  "Десятина": 4000,
+  "Квартира": 10000,
+  "Продукти та товари": 12000,
+  "Гроші Дружини": 5000,
+  "Гроші Чоловіка": 5000,
+  "Машина": 5000,
+  "Побачення": 3000,
+};
+
+const STORAGE_KEY = "kislenko_budget_v2";
 
 // ===== ІНІЦІАЛІЗАЦІЯ =====
 function loadState() {
@@ -49,17 +60,45 @@ const historyList = document.getElementById("historyList");
 const lastSync = document.getElementById("last-sync");
 const resetBtn = document.getElementById("resetBtn");
 
+// === створимо новий елемент для відображення загальної суми ===
+let totalDisplay = document.getElementById("total-display");
+if (!totalDisplay) {
+  totalDisplay = document.createElement("div");
+  totalDisplay.className = "card";
+  totalDisplay.style.marginBottom = "12px";
+  totalDisplay.style.fontWeight = "600";
+  totalDisplay.style.textAlign = "center";
+  totalDisplay.style.fontSize = "1.1rem";
+  categoriesGrid.parentElement.prepend(totalDisplay);
+}
+
 // ===== РЕНДЕР =====
 function renderCategories(totals) {
   categoriesGrid.innerHTML = "";
   categorySelect.innerHTML = '<option value="">Оберіть категорію</option>';
 
+  let totalSpent = 0;
+
   CATEGORIES.forEach((cat) => {
+    const spent = Number(totals[cat] || 0);
+    const limit = LIMITS[cat] || 0;
+    const percent = limit ? Math.min((spent / limit) * 100, 100) : 0;
+    totalSpent += spent;
+
+    // Колір прогресу
+    let color = "#48bb78"; // зелений
+    if (percent > 90) color = "#f56565"; // червоний
+    else if (percent > 60) color = "#ecc94b"; // жовтий
+
     const card = document.createElement("div");
     card.className = "card";
     card.innerHTML = `
       <div class="category-name">${cat}</div>
-      <div class="amount">${Number(totals[cat] || 0).toFixed(2)} ₴</div>
+      <div class="amount">${spent.toFixed(2)} ₴</div>
+      <div class="small">Ліміт: ${limit.toFixed(2)} ₴</div>
+      <div class="progress-bar">
+        <div class="progress" style="width:${percent}%; background:${color}"></div>
+      </div>
     `;
     categoriesGrid.appendChild(card);
 
@@ -68,6 +107,9 @@ function renderCategories(totals) {
     opt.textContent = cat;
     categorySelect.appendChild(opt);
   });
+
+  // Показати загальну витрату
+  totalDisplay.textContent = `Загальні витрати: ${totalSpent.toFixed(2)} ₴`;
 }
 
 function renderHistory(history) {
