@@ -1,174 +1,66 @@
 <!doctype html>
 <html lang="uk">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Бюджет сім'ї Кісленко</title>
-<style>
-  :root{
-    --bg:#f7f9fc; --card:#fff; --accent:#2b6cb0; --muted:#6b7280;
-  }
-  body{font-family:Inter,system-ui,Arial; margin:0; background:var(--bg); color:#111;}
-  .container{max-width:840px;margin:24px auto;padding:16px;}
-  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
-  h1{font-size:1.25rem;margin:0;}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;}
-  .card{background:var(--card);padding:12px;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,0.06);}
-  .category-name{font-weight:600;margin-bottom:6px;}
-  .amount{font-size:1.4rem;color:var(--accent);}
-  form{display:flex;flex-direction:column;gap:8px;margin-top:12px;}
-  select,input[type=number]{padding:8px;border-radius:8px;border:1px solid #e5e7eb;}
-  button{padding:10px;border-radius:8px;border:none;background:var(--accent);color:white;font-weight:600;cursor:pointer;}
-  .row{display:flex;gap:8px;align-items:center;}
-  @media (max-width:420px){ .row{flex-direction:column;align-items:stretch} }
-  .history{margin-top:14px;}
-  .hist-item{font-size:0.9rem;color:var(--muted);padding:6px 8px;border-radius:6px;background:#f1f5f9;margin-bottom:6px;}
-  .controls{display:flex;gap:8px;align-items:center;}
-  .small{font-size:0.85rem;color:var(--muted);}
-</style>
-</head>
-<body>
-  <div class="container">
-    <header>
-      <h1>Бюджет сімʼї Кісленко</h1>
-      <div class="small">Актуально: <span id="last-sync">—</span></div>
-    </header>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Бюджет сім'ї Кісленко</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>Бюджет сімʼї Кісленко</h1>
+        <div class="small">Актуально: <span id="last-sync">—</span></div>
+      </header>
 
-    <section>
-      <div class="grid" id="categoriesGrid"></div>
-    </section>
+      <section>
+        <div class="grid" id="categoriesGrid"></div>
+      </section>
 
-    <section class="card" style="margin-top:12px;">
-      <form id="expenseForm">
-        <div class="row">
-          <select id="categorySelect" required>
-            <option value="">Оберіть категорію</option>
-          </select>
-          <input id="amountInput" type="number" min="0" step="0.01" placeholder="Сума" required />
-          <button type="submit">Підтвердити</button>
+      <section class="card" style="margin-top:12px;">
+        <form id="expenseForm">
+          <div class="row">
+            <select id="categorySelect" required>
+              <option value="">Оберіть категорію</option>
+            </select>
+            <input
+              id="amountInput"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Сума"
+              required
+            />
+            <button type="submit">Підтвердити</button>
+          </div>
+
+          <div class="select" style="margin-top:6px;">
+            <input
+              id="noteInput"
+              type="text"
+              placeholder="Примітка (необов'язково)"
+              style="flex: 1"
+              class="selectInput"
+            />
+          </div>
+        </form>
+
+        <div class="history">
+          <strong>Останні операції</strong>
+          <div id="historyList"></div>
         </div>
-        <div class="row" style="margin-top:6px;">
-          <input id="noteInput" type="text" placeholder="Примітка (необов'язково)" style="flex:1"/>
+      </section>
+
+      <section style="margin-top:12px;display:flex;gap:8px;">
+        <button id="resetBtn" class="buttonReset">
+          Скинути все (local)
+        </button>
+        <div class="small" style="align-self:center;">
+          Дані зараз зберігаються локально в браузері.
         </div>
-      </form>
-      <div class="history">
-        <strong>Останні операції</strong>
-        <div id="historyList"></div>
-      </div>
-    </section>
+      </section>
+    </div>
 
-    <section style="margin-top:12px;display:flex;gap:8px;">
-      <button id="resetBtn" class="card" style="cursor:pointer;">Скинути все (local)</button>
-      <div class="small" style="align-self:center;">Дані зараз зберігаються локально в браузері.</div>
-    </section>
-  </div>
-
-<script>
-  const CATEGORIES = [
-    'Продукти та товари',
-    'Побачення',
-    'Гроші Чоловіка',
-    'Гроші Дружини',
-    'Машина',
-    'Квартира',
-    'Десятина'
-  ];
-
-  const STORAGE_KEY = 'kislenko_budget_v1';
-
-  // Ініціалізація даних
-  function loadState(){
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if(!raw) {
-      // створюємо базову структуру
-      const init = {
-        totals: CATEGORIES.reduce((acc,c)=>{acc[c]=0;return acc;},{}),
-        history: [],
-        updatedAt: new Date().toISOString()
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(init));
-      return init;
-    }
-    try { return JSON.parse(raw); } catch(e){ console.error(e); return null; }
-  }
-
-  function saveState(state){
-    state.updatedAt = new Date().toISOString();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    render();
-  }
-
-  // UI елементи
-  const categoriesGrid = document.getElementById('categoriesGrid');
-  const categorySelect = document.getElementById('categorySelect');
-  const amountInput = document.getElementById('amountInput');
-  const noteInput = document.getElementById('noteInput');
-  const expenseForm = document.getElementById('expenseForm');
-  const historyList = document.getElementById('historyList');
-  const lastSync = document.getElementById('last-sync');
-  const resetBtn = document.getElementById('resetBtn');
-
-  // Рендер категорій
-  function renderCategories(totals){
-    categoriesGrid.innerHTML = '';
-    categorySelect.innerHTML = '<option value="">Оберіть категорію</option>';
-    CATEGORIES.forEach(cat=>{
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.innerHTML = `<div class="category-name">${cat}</div><div class="amount">${Number(totals[cat]||0).toFixed(2)} ₴</div>`;
-      categoriesGrid.appendChild(card);
-
-      const opt = document.createElement('option');
-      opt.value = cat;
-      opt.textContent = cat;
-      categorySelect.appendChild(opt);
-    });
-  }
-
-  function renderHistory(history){
-    historyList.innerHTML = '';
-    const items = history.slice().reverse().slice(0,10); // останні 10
-    if(items.length===0) historyList.innerHTML = '<div class="small">Порожньо</div>';
-    items.forEach(h=>{
-      const d = new Date(h.at);
-      const div = document.createElement('div');
-      div.className = 'hist-item';
-      div.textContent = `${d.toLocaleString()} — ${h.category} : ${Number(h.amount).toFixed(2)} ₴ ${h.note?(' — '+h.note):''}`;
-      historyList.appendChild(div);
-    });
-  }
-
-  function render(){
-    const state = loadState();
-    renderCategories(state.totals);
-    renderHistory(state.history);
-    lastSync.textContent = new Date(state.updatedAt).toLocaleString();
-  }
-
-  // Обробник форми
-  expenseForm.addEventListener('submit', e=>{
-    e.preventDefault();
-    const cat = categorySelect.value;
-    const amt = parseFloat(amountInput.value);
-    if(!cat || isNaN(amt) || amt<=0) return alert('Оберіть категорію і введіть позитивну суму.');
-    const state = loadState();
-    // додаємо витрату
-    state.totals[cat] = Number((Number(state.totals[cat]||0) + amt).toFixed(2));
-    state.history.push({ category: cat, amount: amt, note: noteInput.value||'', at: new Date().toISOString() });
-    saveState(state);
-    // очищуємо форму
-    amountInput.value = '';
-    noteInput.value = '';
-  });
-
-  resetBtn.addEventListener('click', ()=>{
-    if(!confirm('Скинути всі локальні дані?')) return;
-    localStorage.removeItem(STORAGE_KEY);
-    render();
-  });
-
-  // Перший рендер
-  render();
-</script>
-</body>
+    <script src="./script.js"></script>
+  </body>
 </html>
